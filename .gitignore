@@ -1,0 +1,29 @@
+node_modules
+dist
+build
+*.log
+.env
+.env.local
+.DS_Store
+coverage
+.cache
+.turbo
+
+# Mobile specific
+apps/mobile/ios/Pods
+apps/mobile/ios/build
+apps/mobile/android/.gradle
+apps/mobile/android/build
+apps/mobile/android/app/build
+*.jks
+*.keystore
+apps/mobile/.expo
+
+# API specific
+apps/api/prisma/migrations
+
+# IDEs
+.idea
+.vscode
+*.swp
+*.swo
