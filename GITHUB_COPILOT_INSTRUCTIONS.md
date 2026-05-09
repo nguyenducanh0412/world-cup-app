@@ -15,7 +15,7 @@ Tài liệu này dành cho **GitHub Copilot Workspace Agent** làm việc trong 
 
 **Monorepo layout:**
 ```
-apps/mobile   → React Native 0.74 CLI + TypeScript
+apps/mobile   → React Native 0.85.3 CLI + TypeScript + React 19
 apps/api      → Node.js + Fastify + Prisma
 packages/shared → Shared TypeScript types
 ```
