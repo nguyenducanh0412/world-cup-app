@@ -36,7 +36,7 @@ async function main() {
     
     try {
       await prisma.$queryRaw`SELECT 1`;
-    } catch (_error) {
+    } catch {
       dbStatus = 'error';
     }
 
