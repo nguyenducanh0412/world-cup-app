@@ -31,12 +31,12 @@ async function main() {
   });
 
   // Health check endpoint
-  server.get('/api/v1/health', async (request, reply) => {
+  server.get('/api/v1/health', async (_request, _reply) => {
     let dbStatus = 'ok';
     
     try {
       await prisma.$queryRaw`SELECT 1`;
-    } catch (error) {
+    } catch (_error) {
       dbStatus = 'error';
     }
 
