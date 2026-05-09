@@ -1,6 +1,13 @@
-# Copilot Workspace — Build Steps
+# Copilot Workspace — Build Steps (No Monorepo)
 
 Đây là 6 prompt steps để GitHub Copilot Workspace Agent xây dựng toàn bộ dự án KickOff.
+
+**Cấu trúc mới — 2 repo độc lập:**
+```
+mobile/   → React Native app (repo này)
+api/      → Fastify backend (repo riêng)
+```
+Shared types được copy thẳng vào từng repo — không dùng workspace packages.
 
 **Quy tắc:**
 - Chạy từng step theo thứ tự — **không bỏ qua**
@@ -10,105 +17,98 @@
 
 ---
 
-## Step 1 — Khởi tạo monorepo + React Native CLI
+## Step 1 — Khởi tạo 2 project độc lập
 
 ```
-You are a senior React Native engineer. Read GITHUB_COPILOT_INSTRUCTIONS.md
-first, then initialize the KickOff monorepo.
+You are a senior React Native engineer. Read GITHUB_COPILOT_INSTRUCTIONS.md first.
 
 KickOff is a World Cup 2026 match viewer + friend betting rooms app.
 Points only — no real money, no payment system.
 
-TASK: Project setup with React Native CLI (no Expo)
+IMPORTANT: This is NOT a monorepo. We have 2 standalone projects:
+  - mobile/ (this repo) — React Native CLI app
+  - api/ (separate repo) — Fastify backend
+
+Do NOT create workspaces, do NOT use "workspace:*" dependencies.
+All shared types live in src/types/shared.ts in each project independently.
+
+TASK: Initialize both projects
 
 ───────────────────────────────────────────
-1. ROOT — npm workspaces monorepo
+1. api — Fastify + TypeScript
 ───────────────────────────────────────────
-Create root package.json:
-{
-  "name": "kickoff",
-  "private": true,
-  "workspaces": ["apps/*", "packages/*"],
-  "scripts": {
-    "dev": "npm run dev --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
-  }
-}
-
-───────────────────────────────────────────
-2. packages/shared
-───────────────────────────────────────────
-packages/shared/package.json: name "@kickoff/shared"
-packages/shared/src/index.ts — export all shared types:
-
-  Enums (as string union types):
-    MatchStatus = 'SCHEDULED' | 'LIVE' | 'FINISHED'
-    MatchStage = 'GROUP' | 'R16' | 'QF' | 'SF' | 'THIRD_PLACE' | 'FINAL'
-    ScoringMode = 'EXACT_SCORE' | 'OUTCOME_ONLY'
-
-  Interfaces:
-    User { id, supabaseId, username, avatarUrl?, createdAt }
-    Match { id, externalId, homeTeam, awayTeam, homeFlagUrl?, awayFlagUrl?,
-            homeScore?, awayScore?, scheduledAt, status, stage, groupName?,
-            venue?, updatedAt }
-    Room { id, name, inviteCode, creatorId, scoringMode, createdAt,
-           memberCount?, members? }
-    RoomMember { id, userId, roomId, joinedAt, user? }
-    Prediction { id, userId, matchId, roomId, predictedHome, predictedAway,
-                 pointsEarned?, isSettled, createdAt, user?, match? }
-    LeaderboardEntry { userId, username, avatarUrl?, totalPoints,
-                       totalPredictions, exactScores, correctOutcomes, rank }
-    ApiResponse<T> { success: boolean, data: T }
-    PaginatedResponse<T> { success: boolean, data: T[], total: number,
-                            page: number, pageSize: number }
-
-packages/shared/src/scoring.ts — export:
-  calculatePoints(predictedHome, predictedAway, actualHome, actualAway,
-                  mode: ScoringMode): number
-  Logic:
-    EXACT_SCORE: exact match = 3pts, correct outcome = 1pt, wrong = 0
-    OUTCOME_ONLY: correct outcome = 2pts, wrong = 0
-    (outcome = sign(home - away): positive=home win, 0=draw, negative=away win)
-
-───────────────────────────────────────────
-3. apps/api — Fastify + TypeScript
-───────────────────────────────────────────
-apps/api/package.json: name "@kickoff/api"
+Root package.json: name "api", version "1.0.0"
 Dependencies:
   fastify @fastify/cors @fastify/jwt @fastify/sensible
   prisma @prisma/client
   @supabase/supabase-js
-  zod
-  dotenv
-  node-cron
-  axios
-  firebase-admin
-  @kickoff/shared (workspace:*)
+  zod dotenv node-cron axios firebase-admin
 
 DevDependencies:
   typescript ts-node-dev @types/node @types/node-cron vitest supertest
 
-apps/api/tsconfig.json — strict mode, paths alias @ → src/
-apps/api/src/index.ts — Fastify server:
+tsconfig.json — strict mode, paths alias @ → src/
+
+src/types/shared.ts — Shared types (copy, no package import):
+
+  // Enums as string unions
+  export type MatchStatus = 'SCHEDULED' | 'LIVE' | 'FINISHED'
+  export type MatchStage = 'GROUP' | 'R16' | 'QF' | 'SF' | 'THIRD_PLACE' | 'FINAL'
+  export type ScoringMode = 'EXACT_SCORE' | 'OUTCOME_ONLY'
+
+  // Interfaces
+  export interface User { id: string; supabaseId: string; username: string; avatarUrl?: string; createdAt: string }
+  export interface Match { id: string; externalId: string; homeTeam: string; awayTeam: string; homeFlagUrl?: string; awayFlagUrl?: string; homeScore?: number; awayScore?: number; scheduledAt: string; status: MatchStatus; stage: MatchStage; groupName?: string; venue?: string; updatedAt: string }
+  export interface Room { id: string; name: string; inviteCode: string; creatorId: string; scoringMode: ScoringMode; createdAt: string; memberCount?: number; members?: RoomMember[] }
+  export interface RoomMember { id: string; userId: string; roomId: string; joinedAt: string; user?: User }
+  export interface Prediction { id: string; userId: string; matchId: string; roomId: string; predictedHome: number; predictedAway: number; pointsEarned?: number; isSettled: boolean; createdAt: string; user?: User; match?: Match }
+  export interface LeaderboardEntry { userId: string; username: string; avatarUrl?: string; totalPoints: number; totalPredictions: number; exactScores: number; correctOutcomes: number; rank: number }
+  export interface ApiResponse<T> { success: boolean; data: T }
+  export interface PaginatedResponse<T> { success: boolean; data: T[]; total: number; page: number; pageSize: number }
+
+src/utils/scoring.ts — Scoring logic (copy, no package import):
+  export function calculatePoints(
+    predictedHome: number, predictedAway: number,
+    actualHome: number, actualAway: number,
+    mode: ScoringMode
+  ): number
+  Logic:
+    outcome = sign of (score - score): positive=home win, 0=draw, negative=away win
+    EXACT_SCORE: exact match = 3pts, correct outcome only = 1pt, wrong = 0
+    OUTCOME_ONLY: correct outcome = 2pts, wrong = 0
+
+src/index.ts — Fastify server:
   - register @fastify/cors (origin: *)
-  - register @fastify/sensible (for httpErrors)
+  - register @fastify/sensible
   - register @fastify/jwt (secret from JWT_SECRET env)
   - GET /api/v1/health → { status: 'ok', db: 'ok', time: new Date().toISOString() }
     (check db with prisma.$queryRaw`SELECT 1`)
   - listen on PORT env (default 3000)
   - graceful shutdown on SIGTERM
 
-apps/api/.env.example with all vars and comments:
-  DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY,
-  FOOTBALL_DATA_API_KEY, JWT_SECRET, PORT, FIREBASE_SERVICE_ACCOUNT_JSON
+.env.example:
+  DATABASE_URL=
+  SUPABASE_URL=
+  SUPABASE_SERVICE_KEY=
+  SUPABASE_ANON_KEY=
+  FOOTBALL_DATA_API_KEY=
+  JWT_SECRET=
+  PORT=3000
+  FIREBASE_SERVICE_ACCOUNT_JSON=
 
 ───────────────────────────────────────────
-4. apps/mobile — React Native CLI 0.74 + TypeScript
+2. mobile — React Native CLI 0.85.3 + TypeScript
 ───────────────────────────────────────────
-apps/mobile/package.json: name "@kickoff/mobile"
+Root package.json: name "mobile", version "1.0.0"
+
+IMPORTANT iOS/Android config:
+  - This is a standalone React Native project (NOT inside a monorepo)
+  - node_modules is at the root of mobile/
+  - ios/Podfile must use standard paths (not ../../.. relative paths)
+
 Dependencies:
+  react@18.3.1 react-native@0.85.3
+
   # Navigation
   @react-navigation/native @react-navigation/bottom-tabs
   @react-navigation/native-stack
@@ -135,9 +135,10 @@ Dependencies:
   react-native-vector-icons react-native-haptic-feedback
   react-native-share react-native-config
 
-  @kickoff/shared (workspace:*)
+src/types/shared.ts — Same shared types as API (copy verbatim)
+src/utils/scoring.ts — Same scoring logic as API (copy verbatim)
 
-apps/mobile/tamagui.config.ts:
+tamagui.config.ts:
   Base: @tamagui/config/v3
   Override tokens:
     colors:
@@ -156,16 +157,53 @@ apps/mobile/tamagui.config.ts:
       textSecondary: '#AEAEB2'
   Dark theme as default
 
-apps/mobile/babel.config.js:
+babel.config.js:
   Add @tamagui/babel-plugin pointing to tamagui.config.ts
   Add react-native-reanimated/plugin (must be last)
 
-apps/mobile/.env.example:
+.env.example:
   API_URL=http://localhost:3000/api/v1
   SUPABASE_URL=
   SUPABASE_ANON_KEY=
 
-apps/mobile/src/ folder structure (create empty index files):
+ios/Podfile — Standard standalone config (NOT monorepo):
+  require Pod::Executable.execute_command(
+    'node',
+    ['-p',
+     'require.resolve(
+       "react-native/scripts/react_native_pods.rb",
+       {paths: [process.argv[1]]},
+     )', __dir__]
+  ).strip
+
+  platform :ios, min_ios_version_supported
+  prepare_react_native_project!
+
+  linkage = ENV['USE_FRAMEWORKS']
+  if linkage != nil
+    Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+    use_frameworks! :linkage => linkage.to_sym
+  end
+
+  target 'mobile' do
+    config = use_native_modules!
+    use_react_native!(
+      :path => config[:reactNativePath],
+      :app_path => "#{Pod::Config.instance.installation_root}/.."
+    )
+    post_install do |installer|
+      react_native_post_install(
+        installer,
+        config[:reactNativePath],
+        :mac_catalyst_enabled => false
+      )
+    end
+  end
+
+android/build.gradle — Add Reanimated + Gesture Handler config
+android/app/build.gradle — Standard RN 0.85 config
+
+src/ folder structure (create empty index files):
   components/ui/
   screens/
   navigation/
@@ -176,9 +214,9 @@ apps/mobile/src/ folder structure (create empty index files):
   types/
 
 ───────────────────────────────────────────
-5. CI/CD
+3. CI/CD
 ───────────────────────────────────────────
-.github/workflows/ci.yml:
+api/.github/workflows/ci.yml:
   Trigger: push + pull_request to main
   Job lint-and-test (ubuntu-latest, node 20):
     - checkout
@@ -188,19 +226,19 @@ apps/mobile/src/ folder structure (create empty index files):
     - npm run build
   Job deploy-api (only on push to main, needs lint-and-test):
     - install railway CLI
-    - railway up --service kickoff-api
-  Job build-mobile (only on push to main, needs lint-and-test):
-    - setup eas-cli
-    - eas build --platform all --profile preview --non-interactive
+    - railway up --service api
 
-apps/api/railway.toml:
+api/railway.toml:
   [build] command = "npx prisma migrate deploy && npm run build"
   [deploy] startCommand = "node dist/index.js"
              healthcheckPath = "/api/v1/health"
 
+mobile/.github/workflows/ci.yml:
+  Job build-mobile (on push to main):
+    - setup eas-cli
+    - eas build --platform all --profile preview --non-interactive
+
 Generate ALL files completely. Do not skip any file.
-Include android/build.gradle changes for Reanimated + Gesture Handler.
-Include ios/Podfile changes for the same.
 ```
 
 ---
@@ -208,13 +246,14 @@ Include ios/Podfile changes for the same.
 ## Step 2 — Database schema + Match API
 
 ```
-Continue KickOff. Read GITHUB_COPILOT_INSTRUCTIONS.md.
-Monorepo is initialized. Now build the database and match endpoints.
+Continue KickOff API (api repo). Read GITHUB_COPILOT_INSTRUCTIONS.md.
+Project is a standalone Fastify app — NOT a monorepo.
+Import shared types from src/types/shared.ts, scoring from src/utils/scoring.ts.
 
 ───────────────────────────────────────────
 PART A — Prisma schema
 ───────────────────────────────────────────
-Create apps/api/prisma/schema.prisma:
+Create prisma/schema.prisma:
 
 datasource db { provider = "postgresql", url = env("DATABASE_URL") }
 generator client { provider = "prisma-client-js" }
@@ -284,12 +323,12 @@ Prediction:
   createdAt DateTime @default(now())
   @@unique([userId, matchId, roomId])
 
-Enums: MatchStatus, MatchStage, ScoringMode (matching shared types)
+Enums: MatchStatus, MatchStage, ScoringMode (matching shared types in src/types/shared.ts)
 
 ───────────────────────────────────────────
 PART B — Seed data
 ───────────────────────────────────────────
-apps/api/prisma/seed.ts — seed real WC2026 data:
+prisma/seed.ts — seed real WC2026 data:
   48 group stage matches with:
   - Correct teams (32 qualified teams)
   - Real scheduled dates: Jun 11 – Jun 30 2026
@@ -308,7 +347,7 @@ Add to package.json scripts:
 ───────────────────────────────────────────
 PART C — Match sync service
 ───────────────────────────────────────────
-apps/api/src/services/matchSyncService.ts:
+src/services/matchSyncService.ts:
 
   fetchAndSyncMatches():
     GET https://api.football-data.org/v4/competitions/WC/matches
@@ -329,7 +368,7 @@ apps/api/src/services/matchSyncService.ts:
     node-cron every 60 seconds: updateLiveScores()
     (updateLiveScores cron only active Jun 11 – Jul 19 2026)
 
-apps/api/src/services/supabaseSync.ts:
+src/services/supabaseSync.ts:
   Initialize Supabase admin client (SUPABASE_SERVICE_KEY)
   syncLiveScore(matchId, homeScore, awayScore, status):
     upsert to "live_scores" table in Supabase
@@ -338,9 +377,9 @@ apps/api/src/services/supabaseSync.ts:
 ───────────────────────────────────────────
 PART D — Match routes
 ───────────────────────────────────────────
-apps/api/src/routes/matches.ts (Fastify plugin):
+src/routes/matches.ts (Fastify plugin):
 
-All responses: ApiResponse<T> from @kickoff/shared
+All responses: ApiResponse<T> from src/types/shared.ts
 No auth required on any match endpoint
 In-memory cache (Map<string, {data, timestamp}>) with 30s TTL
 
@@ -349,19 +388,10 @@ GET /api/v1/matches
   Filter by date: matches where scheduledAt is on that date
   Filter by search: homeTeam or awayTeam contains search (case-insensitive)
   Sort: scheduledAt ASC
-  Cache key: JSON.stringify(query)
 
-GET /api/v1/matches/live
-  Return all LIVE matches
-  No cache (always fresh)
-
-GET /api/v1/matches/upcoming
-  Return next 10 SCHEDULED matches (scheduledAt > now, sorted ASC)
-  Cache 30s
-
-GET /api/v1/matches/:id
-  Return single match by id
-  404 if not found
+GET /api/v1/matches/live — Return all LIVE matches, no cache
+GET /api/v1/matches/upcoming — Next 10 SCHEDULED matches, cache 30s
+GET /api/v1/matches/:id — Single match, 404 if not found
 
 Register plugin in src/index.ts.
 Generate all files completely.
@@ -372,13 +402,15 @@ Generate all files completely.
 ## Step 3 — Room system + Predictions
 
 ```
-Continue KickOff. Read GITHUB_COPILOT_INSTRUCTIONS.md.
+Continue KickOff API (api repo). Read GITHUB_COPILOT_INSTRUCTIONS.md.
+Standalone Fastify app — NOT monorepo.
+Import shared types from src/types/shared.ts, scoring from src/utils/scoring.ts.
 Match API is ready. Now build rooms and predictions.
 
 ───────────────────────────────────────────
 PART A — Auth middleware
 ───────────────────────────────────────────
-apps/api/src/middleware/auth.ts:
+src/middleware/auth.ts:
   FastifyPreHandlerHookHandler
   1. Extract Bearer token from Authorization header
   2. Verify with Supabase: GET SUPABASE_URL/auth/v1/user (pass token)
@@ -392,53 +424,37 @@ Extend FastifyRequest type to include userId: string
 ───────────────────────────────────────────
 PART B — Room service
 ───────────────────────────────────────────
-apps/api/src/services/roomService.ts:
+src/services/roomService.ts:
 
-generateInviteCode(): string
-  6 chars, uppercase alphanumeric, ensure uniqueness (retry if collision)
+generateInviteCode(): 6 chars uppercase alphanumeric, unique (retry on collision)
 
 createRoom(creatorId, name, scoringMode):
   Generate invite code
-  prisma.room.create with data + auto-create first RoomMember (creator)
+  prisma.room.create + auto-create first RoomMember (creator)
   Return room with member count
 
 joinRoom(userId, inviteCode):
-  Find room by inviteCode (case-insensitive)
-  404 if not found
+  Find room by inviteCode (case-insensitive), 404 if not found
   400 if user already member
-  prisma.roomMember.create
-  Return updated room
+  prisma.roomMember.create, return updated room
 
 leaveRoom(userId, roomId):
-  Verify membership exists, else 404
+  Verify membership, else 404
   Delete RoomMember
   If userId === room.creatorId:
     Find oldest other member → update room.creatorId
     If no other members → delete room
 
-getRoomLeaderboard(roomId):
-  Query all settled predictions grouped by userId
-  For each user: sum pointsEarned, count total, count exact (pointsEarned=3 in EXACT_SCORE), count correct (pointsEarned>0)
-  Join with User for username + avatarUrl
-  Sort by totalPoints DESC
-  Add rank (1-indexed)
-  Return LeaderboardEntry[]
-
-getMyRooms(userId):
-  Find all rooms where userId is a member
-  For each room: include my rank from leaderboard + unpredicted upcoming match count
-  Return enriched array
-
-getRoomDetail(roomId, requestingUserId):
-  Verify requestingUserId is member, else 403
-  Return room + memberCount + scoringMode
+getRoomLeaderboard(roomId): Return LeaderboardEntry[] sorted by totalPoints DESC
+getMyRooms(userId): Rooms where userId is member + my rank + unpredicted count
+getRoomDetail(roomId, requestingUserId): Verify member (403 if not), return room details
 
 ───────────────────────────────────────────
 PART C — Prediction service
 ───────────────────────────────────────────
-apps/api/src/services/predictionService.ts:
+src/services/predictionService.ts:
 
-Import calculatePoints from @kickoff/shared
+Import calculatePoints from src/utils/scoring.ts
 
 placePrediction(userId, matchId, roomId, predictedHome, predictedAway):
   Fetch match — 404 if not found
@@ -457,19 +473,15 @@ settlePredictions(matchId):
                               match.homeScore, match.awayScore, scoringMode)
     Update prediction: isSettled=true, pointsEarned=points
   Return array of {userId, roomId, pointsEarned}
-  (caller handles notifications)
 
 getMatchPredictionsInRoom(matchId, roomId, requestingUserId):
-  If match.status === 'SCHEDULED':
-    Return only predictions where userId === requestingUserId
-  Else (LIVE or FINISHED):
-    Return all predictions in room with user info
-    Include pointsEarned if settled
+  If SCHEDULED: return only requestingUserId's prediction
+  Else: return all predictions with user info + pointsEarned if settled
 
 ───────────────────────────────────────────
 PART D — Routes
 ───────────────────────────────────────────
-apps/api/src/routes/rooms.ts (all require authenticate):
+src/routes/rooms.ts (all require authenticate):
   POST   /rooms               body: {name, scoringMode}
   GET    /rooms/my
   GET    /rooms/join/:code    (no auth — preview only)
@@ -479,18 +491,15 @@ apps/api/src/routes/rooms.ts (all require authenticate):
   GET    /rooms/:id/leaderboard
   GET    /rooms/:id/matches/:matchId/predictions
 
-apps/api/src/routes/predictions.ts (all require authenticate):
-  POST /predictions
-    body: {matchId, roomId, predictedHome, predictedAway}
-    Zod validation: predictedHome/Away are non-negative integers 0–20
-  GET  /predictions/my
-    query: roomId? matchId? settled? (boolean string)
+src/routes/predictions.ts (all require authenticate):
+  POST /predictions   body: {matchId, roomId, predictedHome, predictedAway}
+  GET  /predictions/my  query: roomId? matchId? settled?
 
-apps/api/src/routes/users.ts (all require authenticate):
+src/routes/users.ts (all require authenticate):
   GET   /users/me
-  PATCH /users/me             body: {username?, avatarUrl?}
-  GET   /users/check          query: {username} → {available: boolean}
-  PUT   /users/push-token     body: {token}
+  PATCH /users/me     body: {username?, avatarUrl?}
+  GET   /users/check  query: {username} → {available: boolean}
+  PUT   /users/push-token  body: {token}
 
 Register all plugins in src/index.ts.
 Generate all files completely.
@@ -501,7 +510,8 @@ Generate all files completely.
 ## Step 4 — Push notifications
 
 ```
-Continue KickOff. Read GITHUB_COPILOT_INSTRUCTIONS.md.
+Continue KickOff API (api repo). Read GITHUB_COPILOT_INSTRUCTIONS.md.
+Standalone Fastify app — NOT monorepo.
 Rooms and predictions are ready. Now build push notifications.
 
 NOTE: Using Firebase Admin (server) + Notifee/@react-native-firebase (mobile).
@@ -510,7 +520,7 @@ No Expo push API. No BullMQ. Use node-cron for scheduling.
 ───────────────────────────────────────────
 PART A — API notification service
 ───────────────────────────────────────────
-apps/api/src/services/notificationService.ts:
+src/services/notificationService.ts:
 
 Initialize Firebase Admin:
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)
@@ -528,75 +538,62 @@ sendToUser(userId, {title, body, data}):
   })
 
 notifyMatchReminder(matchId):
-  Find all users with unsettled predictions on this match (any room)
-  For each: sendToUser with:
-    title: "⚽ Sắp bắt đầu!"
-    body: "{homeTeam} vs {awayTeam} · 30 phút nữa"
-    data: { type: 'MATCH_REMINDER', matchId }
+  title: "⚽ Sắp bắt đầu!"
+  body: "{homeTeam} vs {awayTeam} · 30 phút nữa"
+  data: { type: 'MATCH_REMINDER', matchId }
 
-notifyPredictionResult(userId, matchName, pointsEarned, newRank?):
-  sendToUser with:
-    title: pointsEarned > 0 ? "🎯 Dự đoán đúng!" : "😬 Lần sau nhé"
-    body: pointsEarned > 0
-      ? "{matchName} · +{pointsEarned} điểm"
-      : "{matchName} · 0 điểm"
-    data: { type: 'BET_RESULT', matchId }
+notifyPredictionResult(userId, matchName, pointsEarned):
+  title: pointsEarned > 0 ? "🎯 Dự đoán đúng!" : "😬 Lần sau nhé"
+  body: pointsEarned > 0 ? "{matchName} · +{pointsEarned} điểm" : "{matchName} · 0 điểm"
+  data: { type: 'BET_RESULT', matchId }
 
 notifyRoomInvite(userId, roomName, inviterUsername, inviteCode):
-  sendToUser with:
-    title: "👥 {inviterUsername} mời bạn vào phòng"
-    body: "Tham gia phòng \"{roomName}\""
-    data: { type: 'ROOM_INVITE', inviteCode }
+  title: "👥 {inviterUsername} mời bạn vào phòng"
+  body: "Tham gia phòng \"{roomName}\""
+  data: { type: 'ROOM_INVITE', inviteCode }
 
 ───────────────────────────────────────────
 PART B — Notification scheduler
 ───────────────────────────────────────────
-apps/api/src/services/notificationScheduler.ts:
+src/services/notificationScheduler.ts:
 
-In-memory dedup: Map<string, Set<string>>
-  key: matchId, value: Set of userIds already reminded
-  Reset entire map daily at midnight (cron '0 0 * * *')
+In-memory dedup: Map<string, Set<string>> (key: matchId, value: Set of userIds)
+Reset daily at midnight (cron '0 0 * * *')
 
 checkMatchReminders():
-  Find matches where scheduledAt is between (now + 28min) and (now + 32min)
-  AND status === 'SCHEDULED'
-  For each match:
-    For each user with predictions on it:
-      If NOT in dedup map: send reminder + add to dedup
+  Find matches where scheduledAt between (now + 28min) and (now + 32min) AND status === 'SCHEDULED'
+  For each match + user with predictions: send reminder if not in dedup
 
-Register cron in src/index.ts:
-  cron.schedule('* * * * *', () => notificationScheduler.checkMatchReminders())
+Register cron in src/index.ts: cron.schedule('* * * * *', checkMatchReminders)
 
 ───────────────────────────────────────────
 PART C — Wire settlement → notifications
 ───────────────────────────────────────────
-Update apps/api/src/services/matchSyncService.ts:
-  After calling predictionService.settlePredictions(matchId):
-    For each {userId, pointsEarned} returned:
-      Call notificationService.notifyPredictionResult(userId, matchName, pointsEarned)
+Update src/services/matchSyncService.ts:
+  After predictionService.settlePredictions(matchId):
+    For each {userId, pointsEarned}: call notifyPredictionResult()
 
 ───────────────────────────────────────────
-PART D — Mobile notification setup
+PART D — Mobile notification setup (mobile repo)
 ───────────────────────────────────────────
-apps/mobile/src/hooks/useNotifications.ts:
+src/hooks/useNotifications.ts:
   1. notifee.requestPermission()
   2. messaging().getToken() → get FCM token
   3. PUT /api/v1/users/push-token {token}
   4. messaging().onTokenRefresh → re-register
-  5. Foreground handler: notifee.onForegroundEvent
-     - Display notification with notifee.displayNotification()
-  6. Return { isGranted }
+  5. Foreground: notifee.onForegroundEvent → displayNotification()
+  Return { isGranted }
 
-Background handler in apps/mobile/index.js (registerHeadlessTask):
+Background handler in index.js:
   messaging().setBackgroundMessageHandler(async remoteMessage => {
     await notifee.displayNotification(...)
   })
 
-apps/mobile/src/utils/notificationRouter.ts:
-  handleNotificationTap(data: Record<string, string>, navigation):
-    type === 'MATCH_REMINDER' → navigation.navigate('MatchDetail', {matchId})
-    type === 'BET_RESULT' → navigation.navigate('MatchDetail', {matchId})
-    type === 'ROOM_INVITE' → navigation.navigate('JoinRoom', {code: inviteCode})
+src/utils/notificationRouter.ts:
+  handleNotificationTap(data, navigation):
+    MATCH_REMINDER → navigate('MatchDetail', {matchId})
+    BET_RESULT → navigate('MatchDetail', {matchId})
+    ROOM_INVITE → navigate('JoinRoom', {code: inviteCode})
 
 Notification channels (Android, create on app init):
   'match-reminders': importance HIGH, vibration on
@@ -607,7 +604,7 @@ Include google-services.json placeholder and GoogleService-Info.plist placeholde
 with comment instructions for where to get real files from Firebase Console.
 
 android/build.gradle additions for firebase.
-ios/Podfile additions for notifee.
+ios/Podfile — keep standard standalone config (do NOT change to monorepo paths).
 
 Generate all files completely.
 ```
@@ -617,7 +614,9 @@ Generate all files completely.
 ## Step 5 — Mobile UI components + all screens
 
 ```
-Continue KickOff. Read GITHUB_COPILOT_INSTRUCTIONS.md.
+Continue KickOff Mobile (mobile repo). Read GITHUB_COPILOT_INSTRUCTIONS.md.
+Standalone React Native 0.85.3 app — NOT monorepo.
+Import shared types from src/types/shared.ts, scoring from src/utils/scoring.ts.
 API and notifications are ready. Now build the complete mobile app UI.
 
 RULE: Never use React Native's View/Text directly.
@@ -627,257 +626,156 @@ Never hardcode colors — always use Tamagui tokens ($accent, $card, etc.)
 ───────────────────────────────────────────
 PART A — Navigation setup
 ───────────────────────────────────────────
-apps/mobile/src/navigation/types.ts:
+src/navigation/types.ts:
   RootStackParamList:
-    Login: undefined
-    Onboarding: undefined
-    MainTabs: undefined
-    MatchDetail: { matchId: string }
-    RoomDetail: { roomId: string }
-    CreateRoom: undefined
-    JoinRoom: { code?: string }
-
+    Login, Onboarding, MainTabs, MatchDetail: {matchId}, RoomDetail: {roomId},
+    CreateRoom, JoinRoom: {code?}
   TabParamList:
-    Home: undefined
-    Schedule: undefined
-    Rooms: undefined
-    Profile: undefined
+    Home, Schedule, Rooms, Profile
 
-apps/mobile/src/navigation/RootNavigator.tsx:
+src/navigation/RootNavigator.tsx:
   Check authStore.user → show Auth stack or Main stack
-  Auth stack: Login → Onboarding (both as cards)
-  Main stack: MainTabs as root, then modal screens on top
-    MatchDetail: slide from bottom (modal)
-    RoomDetail: push
-    CreateRoom: slide from bottom (modal)
-    JoinRoom: slide from bottom (modal)
+  Auth stack: Login → Onboarding (cards)
+  Main stack: MainTabs + MatchDetail (modal) + RoomDetail + CreateRoom (modal) + JoinRoom (modal)
 
-apps/mobile/src/navigation/MainTabs.tsx:
-  Bottom tab navigator
-  Custom TabBar component:
-    Background: $backgroundSoft with top border 0.5px $border
-    Active: icon + label in $accent
-    Inactive: icon + label in $muted
-    Rooms tab: badge (number) if unpredictedCount > 0
-    Safe area inset at bottom
-  Tabs: Home (home icon), Schedule (calendar), Rooms (users), Profile (user)
-  Icons: react-native-vector-icons Feather set
+src/navigation/MainTabs.tsx:
+  Custom TabBar: $backgroundSoft bg, top border 0.5px $border
+  Active: icon + label $accent. Inactive: $muted
+  Rooms tab: badge if unpredictedCount > 0
+  Icons: react-native-vector-icons Feather
 
-apps/mobile/src/navigation/NavigationService.ts:
+src/navigation/NavigationService.ts:
   navigationRef = createNavigationContainerRef()
   navigate(name, params) — usable outside React components
-  Use this in notification tap handler
 
 ───────────────────────────────────────────
 PART B — Zustand stores
 ───────────────────────────────────────────
-apps/mobile/src/stores/authStore.ts:
-  { user: User|null, session: Session|null, isLoading: boolean }
-  signIn(), signOut(), setUser(), setSession()
-  Persist user + session via react-native-mmkv
+src/stores/authStore.ts:
+  { user, session, isLoading }, signIn(), signOut(), setUser(), setSession()
+  Persist via react-native-mmkv
 
-apps/mobile/src/stores/matchStore.ts:
-  { matches: Match[], liveMatches: Match[] }
-  setMatches(), setLiveMatches()
+src/stores/matchStore.ts:
+  { matches, liveMatches }, setMatches(), setLiveMatches()
   updateLiveScore(matchId, homeScore, awayScore, status)
 
-apps/mobile/src/stores/roomStore.ts:
-  { rooms: Room[], unpredictedCount: number }
-  setRooms(), setUnpredictedCount()
+src/stores/roomStore.ts:
+  { rooms, unpredictedCount }, setRooms(), setUnpredictedCount()
 
 ───────────────────────────────────────────
 PART C — API client
 ───────────────────────────────────────────
-apps/mobile/src/api/client.ts:
+src/api/client.ts:
   axios instance with baseURL from Config.API_URL (react-native-config)
-  Request interceptor: get session from authStore → set Authorization header
+  Request interceptor: Authorization header from authStore session
   Response interceptor: 401 → authStore.signOut()
 
-apps/mobile/src/api/matches.ts: getLive(), getUpcoming(), getAll(params), getById(id)
-apps/mobile/src/api/rooms.ts: getMy(), create(data), joinByCode(code), join(inviteCode),
-                               leave(roomId), getDetail(roomId), getLeaderboard(roomId),
-                               getMatchPredictions(roomId, matchId)
-apps/mobile/src/api/predictions.ts: place(data), getMy(params)
-apps/mobile/src/api/users.ts: getMe(), updateMe(data), checkUsername(username), savePushToken(token)
+src/api/matches.ts: getLive(), getUpcoming(), getAll(params), getById(id)
+src/api/rooms.ts: getMy(), create(data), joinByCode(code), join(inviteCode),
+                  leave(roomId), getDetail(roomId), getLeaderboard(roomId),
+                  getMatchPredictions(roomId, matchId)
+src/api/predictions.ts: place(data), getMy(params)
+src/api/users.ts: getMe(), updateMe(data), checkUsername(username), savePushToken(token)
 
 ───────────────────────────────────────────
 PART D — UI Components
 ───────────────────────────────────────────
-Create all in apps/mobile/src/components/ui/:
+Create all in src/components/ui/:
 
-Badge.tsx — Props: label, variant: 'live'|'scheduled'|'finished'|'won'|'lost'|'draw'
-  LIVE: $red bg, white text, Moti animated pulsing dot (opacity 1↔0.3, 800ms loop)
-  WON: $green bg, white text, ✓
-  LOST: red tint bg, muted text
-  DRAW: $yellow bg, dark text
-  SCHEDULED: transparent, $accent border, $accent text
+Badge.tsx — variant: 'live'|'scheduled'|'finished'|'won'|'lost'|'draw'
+  LIVE: $red bg, pulsing Moti dot. WON: $green. LOST: red tint. DRAW: $yellow. SCHEDULED: $accent border
 
-MatchCard.tsx — Props: match: Match, myPrediction?: Prediction, onPress, variant?: 'full'|'compact'
-  Full variant (schedule screen):
-    XStack: flag (FastImage 28x28) + team name | score or time | flag + team name
-    Bottom: stage/group label + my prediction badge
-    Tap: Reanimated spring scale 0.97→1.0 then onPress
-  Compact variant (home screen horizontal):
-    Condensed, time prominent, score if live/finished
-  Card bg: $card, borderRadius 14, padding 12
+MatchCard.tsx — variant: 'full'|'compact'
+  Full: flag (FastImage 28x28) + team | score or time | flag + team. Tap: spring scale 0.97→1.0
+  Compact: condensed, time prominent, score if live/finished
+  Card: $card bg, borderRadius 14, padding 12
 
-PredictionInput.tsx — Props: onSubmit(home,away), disabled, existing?: Prediction
-  Two columns, each: label (Home/Away), minus button, large number (48px bold), plus button
-  Validate: 0–20 range
-  haptic on each button press (impactLight)
-  Submit: full width, $accent bg, "Confirmar aposta" text
-  Disabled state (match started): muted bg, "Trận đã bắt đầu" text
+PredictionInput.tsx — Two columns (Home/Away): minus button, 48px bold number, plus button
+  Range 0–20, haptic on press, full-width $accent submit button
+  Disabled (match started): muted bg, "Trận đã bắt đầu"
 
-LeaderboardRow.tsx — Props: entry: LeaderboardEntry, isCurrentUser, rank
-  Rank: 28px number, gold (#FFD700) if rank=1, silver if 2, bronze if 3, else $mutedLight
-  Avatar: Avatar component
-  Right: totalPoints large, correctOutcomes/exactScores small below
-  isCurrentUser: $accent left border (2px), $backgroundSoft bg
+LeaderboardRow.tsx — Rank (gold/silver/bronze/#mutedLight), Avatar, totalPoints, correctOutcomes/exactScores
+  isCurrentUser: $accent left border, $backgroundSoft bg
 
-CountdownTimer.tsx — Props: scheduledAt: string
-  dayjs diff to now, update every second with setInterval (cleanup on unmount)
-  Display: "2h 30m" or "45m 20s" when < 1h or "Em breve" when < 30s
-  Red color + seconds visible when < 5 minutes
-  Animated number: Reanimated interpolate for smooth value change
+CountdownTimer.tsx — dayjs diff, update every second
+  "2h 30m" or "45m 20s" or "Em breve" (<30s). Red + seconds when <5 min
+  Reanimated smooth value change
 
-RoomCard.tsx — Props: room, myRank?, myPoints?, unpredictedCount, onPress
-  Room name (bold), member count muted
-  Badge: "#1 · 24 pts" in $accent
-  Orange dot + "3 para prever" if unpredictedCount > 0
-  Chevron right, tap animation
+RoomCard.tsx — name, member count, rank badge, "N para prever" dot, chevron, tap animation
 
-Avatar.tsx — Props: uri?, name, size: 'sm'(32)|'md'(44)|'lg'(80)
-  FastImage if uri, else circle with initials (first 2 chars of name)
-  Background color: deterministic from name (hash → pick from 6 colors)
+Avatar.tsx — FastImage if uri, else initials circle (deterministic color from name hash)
+  Sizes: sm(32) md(44) lg(80)
 
-ScreenHeader.tsx — Props: title, subtitle?, rightAction?: ReactNode
-  title: 28px bold, $textPrimary
-  subtitle: 14px, $textSecondary
-  Used inside scroll content, not as navigation header
-
-EmptyState.tsx — Props: icon, title, subtitle, actionLabel?, onAction?
-  Centered, Feather icon 48px muted, texts, optional $accent button
-
-StatGrid.tsx — Props: stats: {label, value, highlight?}[]
-  2-column grid, each cell: label 12px muted top, value 24px bold bottom
-  highlight=true: value in $accent color
+ScreenHeader.tsx — title 28px bold, subtitle 14px muted, optional rightAction
+EmptyState.tsx — Feather icon 48px, title, subtitle, optional $accent button
+StatGrid.tsx — 2-column grid: label 12px muted, value 24px bold. highlight → $accent
 
 ───────────────────────────────────────────
 PART E — All screens
 ───────────────────────────────────────────
 
 screens/LoginScreen.tsx:
-  Full dark bg ($background)
-  Large ⚽ emoji + "KickOff" wordmark (32px bold)
-  "World Cup 2026" subtitle muted
-  "Continuar com Google" button (white bg, Google "G" icon, dark text, full width)
-  "Continuar com Email" outline button
+  Full dark bg. ⚽ + "KickOff" 32px bold + "World Cup 2026" muted
+  "Continuar com Google" (white bg, Google G icon) + "Continuar com Email" outline
   Supabase signInWithOAuth('google') or signInWithOtp(email)
-  Email flow: show email input → send magic link → "Verifique seu email" state
+  Email flow: input → send magic link → "Verifique seu email" state
 
 screens/OnboardingScreen.tsx:
-  "Escolha seu nome de usuário" heading
-  Tamagui Input (styled, large)
-  Debounced 500ms: GET /users/check → show ✓ green or ✗ red inline
-  "Vamos lá!" button disabled until username valid
-  PATCH /users/me then navigate to MainTabs
+  "Escolha seu nome de usuário" heading, Tamagui Input large
+  Debounced 500ms: GET /users/check → ✓ green or ✗ red inline
+  "Vamos lá!" disabled until valid. PATCH /users/me → navigate MainTabs
 
 screens/HomeScreen.tsx:
   React Query: getLive(), getUpcoming(), roomStore.rooms
-  Supabase Realtime subscription to 'live_scores' channel →
-    on change: matchStore.updateLiveScore() → card re-renders
-  LIVE section: if liveMatches.length > 0:
-    Large card (160px height, $card bg)
-    Teams 22px bold, score 40px bold center, LIVE badge pulsing
-    My prediction for this match (if any) shown below score
+  Supabase Realtime 'live_scores' → matchStore.updateLiveScore()
+  LIVE section: large card (160px), 22px bold teams, 40px bold score, LIVE badge pulsing
   UPCOMING: horizontal FlatList, MatchCard compact, CountdownTimer
-  MY ROOMS: 3 RoomCards max, "Ver tudo →" TextButton
+  MY ROOMS: 3 RoomCards max + "Ver tudo →"
   EmptyState if no rooms: "Crie ou entre em uma sala"
 
 screens/ScheduleScreen.tsx:
-  Segmented pills (custom, not native): All / Grupos / R16 / QF·SF / Final
-  Selected pill: $accent bg, white text. Others: transparent, $muted border
-  React Query: getAll({stage: selectedStage}) refetch on stage change
-  SectionList grouped by date:
-    Section header sticky: "Qui, 12 Jun" in $backgroundSoft
-    MatchCard full variant
-  Pull to refresh
-  Search bar at top (TextInput styled): filter client-side by team name
+  Segmented pills: All / Grupos / R16 / QF·SF / Final
+  SectionList grouped by date (sticky headers)
+  Pull to refresh. Search bar (client-side filter by team name)
 
 screens/MatchDetailScreen.tsx:
-  Route param: matchId
-  React Query: getById(matchId), getMy({matchId})
-  Hero: two FastImage flags 80x80, team names, score 48px or scheduled time
-  Status Badge + venue + stage (muted small text)
-  MY PREDICTION section:
-    If SCHEDULED + no prediction: PredictionInput
-      Room selector: XStack scrollable chips of my rooms
-      On submit: mutation placePrediction → haptic success → optimistic update
-    If SCHEDULED + has prediction: show pick tile + "Editar" button
-    If LIVE or FINISHED: prediction card + pointsEarned with counting animation
-      (Reanimated: interpolate 0→N over 1000ms on mount)
-  ALL PREDICTIONS (only LIVE or FINISHED):
-    React Query: getMatchPredictions(roomId, matchId) for each of my rooms
-    Each room as collapsible section (Moti animate height)
-    Each row: LeaderboardRow style but with prediction shown
+  Hero: flags 80x80, team names, score 48px or time
+  Status Badge + venue + stage
+  MY PREDICTION: PredictionInput (SCHEDULED) or prediction card + points animation (LIVE/FINISHED)
+  Room selector: scrollable chips for room selection
+  ALL PREDICTIONS (LIVE/FINISHED only): collapsible sections per room (Moti animate height)
 
 screens/RoomsScreen.tsx:
-  React Query: getMy() → also update roomStore
-  Header + two buttons row: "Criar sala" ($accent) + "Entrar" (outline)
+  Header + "Criar sala" ($accent) + "Entrar" (outline) buttons
   FlatList of RoomCard
-  Swipe left (Gesture Handler + Reanimated): reveal red "Sair" action
-    On swipe confirm: mutation leaveRoom → remove from list with Moti exit animation
+  Swipe left (Gesture Handler + Reanimated): red "Sair" action
   EmptyState if no rooms
 
 screens/RoomDetailScreen.tsx:
-  Route param: roomId
-  React Query: getDetail(roomId), getLeaderboard(roomId), getMy()
-  Header: room name, invite code pill (tap to copy → Clipboard + haptic impactMedium + "Copiado!" toast)
-  Share button top right: react-native-share with deep link "kickoff://room/join/CODE"
-
+  Room name, invite code pill (tap to copy + haptic + "Copiado!" toast)
+  Share button: react-native-share with deep link "kickoff://room/join/CODE"
   Custom tab pills: Classificação / Próximas / Histórico
-  Tab switch: Reanimated SharedValue for animated underline
-
-  LEADERBOARD tab:
-    FlatList of LeaderboardRow
-    Current user row: highlighted, scrollIntoView if off-screen
-
-  UPCOMING tab:
-    SCHEDULED matches in this context: show MatchCard + my prediction badge
-    Matches not yet predicted: show "Prever →" chip in $accent
-
-  HISTORY tab:
-    FINISHED matches: MatchCard + prediction result chip (WON/LOST/DRAW badge + points)
-    Filter pills: Todos / Acertei / Errei
+  Reanimated animated underline on tab switch
+  LEADERBOARD: FlatList LeaderboardRow, current user highlighted
+  UPCOMING: MatchCard + prediction badge + "Prever →" chip
+  HISTORY: FINISHED matches + WON/LOST/DRAW badge + points
 
 screens/CreateRoomScreen.tsx:
-  Modal presentation (bottom sheet feel via translateY animation on mount)
-  "Criar sala" heading
-  Input: room name (required, max 30 chars, char counter)
-  Scoring mode: two cards side by side
-    "Placar Exato": exact=3pts, outcome=1pt
-    "Resultado": correct outcome=2pts
-    Selected: $accent border + checkmark icon
-  Create button → mutation createRoom → navigate to RoomDetail (replace)
+  Modal. "Criar sala" heading. Room name input (max 30 chars, char counter)
+  Scoring mode: two cards side by side ("Placar Exato" / "Resultado")
+  Selected: $accent border + checkmark. Create → mutation → navigate RoomDetail
 
 screens/JoinRoomScreen.tsx:
-  Route param: code? (prefilled from deep link)
-  "Entrar em uma sala" heading
-  6 individual character boxes (6x TextInput each max 1 char, auto-focus next)
-    Monospace font, large, $card bg, $accent border when focused
-    Auto-uppercase
-  On complete code (6 chars): GET /rooms/join/:code → show room preview
-    Room preview: Moti slide up, RoomCard style, member count, creator name
-  "Entrar" button (active only when preview loaded)
-  Mutation joinRoom → navigate to RoomDetail
+  "Entrar em uma sala". 6 character boxes (auto-focus next, auto-uppercase)
+  On complete: GET /rooms/join/:code → room preview (Moti slide up)
+  "Entrar" button active only when preview loaded. joinRoom → navigate RoomDetail
 
 screens/ProfileScreen.tsx:
   Avatar 80px + username 24px bold + "Membro desde {date}" muted
   StatGrid: Total Pontos, Salas, Previsões, Acertos Exatos
   "Melhor sala" card: room name + my rank
-  Notification toggle: Switch styled with Tamagui theming
-  App version row: muted small
-  Sair button: $red text, Alert.alert confirmation before signOut()
+  Notification toggle: Tamagui Switch
+  App version row. "Sair" button: $red text, Alert.alert confirmation before signOut()
 
 Generate ALL files completely. Every screen must compile without errors.
 ```
@@ -888,12 +786,13 @@ Generate ALL files completely. Every screen must compile without errors.
 
 ```
 Continue KickOff. Read GITHUB_COPILOT_INSTRUCTIONS.md.
+Two standalone repos: api and mobile (NOT monorepo).
 All screens are built. Wire everything together and finalize deployment.
 
 ───────────────────────────────────────────
 PART A — Supabase live_scores table
 ───────────────────────────────────────────
-Create SQL migration file apps/api/prisma/migrations/supabase_live_scores.sql:
+Create SQL migration file api/prisma/migrations/supabase_live_scores.sql:
   CREATE TABLE IF NOT EXISTS live_scores (
     match_id TEXT PRIMARY KEY,
     home_score INTEGER,
@@ -909,144 +808,94 @@ then enable Realtime on live_scores table in Supabase dashboard.
 ───────────────────────────────────────────
 PART B — Mobile Realtime hook
 ───────────────────────────────────────────
-apps/mobile/src/hooks/useLiveScore.ts:
-  Props: matchId?: string (if given: subscribe to single match, else all live)
-  Initialize Supabase client with SUPABASE_URL + SUPABASE_ANON_KEY
+mobile/src/hooks/useLiveScore.ts:
+  Props: matchId?: string
   Subscribe to supabase channel 'live_scores'
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'live_scores',
-      filter: matchId ? `match_id=eq.${matchId}` : undefined
-    }, payload => {
-      matchStore.updateLiveScore(payload.new.match_id,
-                                  payload.new.home_score,
-                                  payload.new.away_score,
-                                  payload.new.status)
-    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'live_scores',
+      filter: matchId ? `match_id=eq.${matchId}` : undefined },
+      payload => matchStore.updateLiveScore(...))
   Unsubscribe on unmount
-  Return { homeScore, awayScore, status } for the matchId if given
+  Return { homeScore, awayScore, status } for matchId if given
 
 Use useLiveScore in:
-  HomeScreen: useLiveScore() (no matchId) → updates all live match cards
-  MatchDetailScreen: useLiveScore(matchId) → updates hero score
+  HomeScreen: useLiveScore() — updates all live match cards
+  MatchDetailScreen: useLiveScore(matchId) — updates hero score
 
 ───────────────────────────────────────────
 PART C — Deep links
 ───────────────────────────────────────────
-apps/mobile/android/app/src/main/AndroidManifest.xml:
-  Add intent-filter for scheme "kickoff", host "room"
-  <data android:scheme="kickoff" android:host="room" />
+mobile/android/app/src/main/AndroidManifest.xml:
+  Add intent-filter: scheme "kickoff", host "room"
 
-apps/mobile/ios/KickOff/Info.plist:
+mobile/ios/KickOffMobile/Info.plist:
   Add CFBundleURLSchemes: ["kickoff"]
 
-apps/mobile/src/navigation/RootNavigator.tsx — handle incoming link:
+mobile/src/navigation/RootNavigator.tsx — handle incoming link:
   useEffect: Linking.getInitialURL() + Linking.addEventListener
-  Parse URL: kickoff://room/join/:code → navigate to JoinRoom {code}
+  Parse: kickoff://room/join/:code → navigate JoinRoom {code}
 
-Share button in RoomDetailScreen:
+Share in RoomDetailScreen:
   const url = `kickoff://room/join/${room.inviteCode}`
   Share.share({ message: `Entre na minha sala "${room.name}" no KickOff! ${url}` })
 
 ───────────────────────────────────────────
-PART D — Settlement complete flow test
+PART D — Tests
 ───────────────────────────────────────────
-Create apps/api/src/__tests__/services/predictionService.test.ts:
-  Test cases for settlePredictions:
-    - EXACT_SCORE mode: exact match → 3 pts
-    - EXACT_SCORE mode: correct outcome only → 1 pt
-    - EXACT_SCORE mode: wrong → 0 pts
-    - OUTCOME_ONLY mode: correct → 2 pts
-    - OUTCOME_ONLY mode: wrong → 0 pts
-    - Draw prediction correct → 1 pt (EXACT_SCORE) / 2 pt (OUTCOME_ONLY)
-    - Marks all predictions as isSettled=true
+api/src/__tests__/services/predictionService.test.ts:
+  EXACT_SCORE: exact match → 3pts, correct outcome → 1pt, wrong → 0pt
+  OUTCOME_ONLY: correct → 2pts, wrong → 0pt
+  Draw prediction correct → 1pt (EXACT) / 2pt (OUTCOME_ONLY)
+  Marks all predictions isSettled=true
 
-Create apps/api/src/__tests__/routes/matches.test.ts:
-  Test GET /api/v1/matches with status filter
-  Test GET /api/v1/matches/live returns only LIVE
-  Test GET /api/v1/health returns 200
+api/src/__tests__/routes/matches.test.ts:
+  GET /api/v1/matches with status filter
+  GET /api/v1/matches/live returns only LIVE
+  GET /api/v1/health returns 200
 
-Create apps/mobile/src/__tests__/scoring.test.ts:
-  Import calculatePoints from @kickoff/shared
-  Test all 6 scoring scenarios above
+mobile/src/__tests__/scoring.test.ts:
+  Import calculatePoints from src/utils/scoring.ts
+  Test all 6 scoring scenarios
 
 ───────────────────────────────────────────
-PART E — Final CI/CD and deployment files
+PART E — Final CI/CD
 ───────────────────────────────────────────
-.github/workflows/ci.yml (final complete version):
+api/.github/workflows/ci.yml (final complete version):
   name: CI/CD
-  on:
-    push: [main]
-    pull_request: [main]
-
+  on: push/pull_request to main
   jobs:
-    lint-and-test:
-      runs-on: ubuntu-latest
-      services:
-        postgres: image postgres:16, env POSTGRES_PASSWORD=test, ports 5432
-      env:
-        DATABASE_URL: postgresql://postgres:test@localhost:5432/kickoff_test
-        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-        SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
-        JWT_SECRET: test-secret-min-32-characters-here
-      steps:
-        - uses: actions/checkout@v4
-        - uses: actions/setup-node@v4 with node-version 20
-        - run: npm ci
-        - run: cd apps/api && npx prisma migrate deploy
-        - run: npm run lint
-        - run: npm run test
-        - run: npm run build
+    lint-and-test (ubuntu-latest, node 20):
+      services: postgres:16 (POSTGRES_PASSWORD=test, port 5432)
+      env: DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_KEY, FOOTBALL_DATA_API_KEY, JWT_SECRET
+      steps: checkout → npm ci → prisma migrate deploy → lint → test → build
+    deploy-api (on push to main, needs lint-and-test):
+      npm install -g @railway/cli → railway up --service api
+      env: RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
-    deploy-api:
-      needs: lint-and-test
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-        - uses: actions/setup-node@v4 with node-version 20
-        - run: npm install -g @railway/cli
-        - run: railway up --service kickoff-api
-          env: RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+mobile/.github/workflows/ci.yml (final):
+  build-mobile (on push to main):
+    npm install -g eas-cli
+    eas build --platform all --profile preview --non-interactive
+    env: EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-    build-mobile:
-      needs: lint-and-test
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-        - uses: actions/setup-node@v4 with node-version 20
-        - run: npm install -g eas-cli
-        - run: cd apps/mobile && eas build --platform all --profile preview --non-interactive
-          env: EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-
-apps/mobile/eas.json:
+mobile/eas.json:
   {
     "cli": { "version": ">= 10.0.0" },
     "build": {
-      "development": {
-        "developmentClient": true,
-        "distribution": "internal"
-      },
-      "preview": {
-        "distribution": "internal",
-        "android": { "buildType": "apk" }
-      },
-      "production": {
-        "autoIncrement": true
-      }
+      "development": { "developmentClient": true, "distribution": "internal" },
+      "preview": { "distribution": "internal", "android": { "buildType": "apk" } },
+      "production": { "autoIncrement": true }
     }
   }
 
-Required GitHub Secrets (add instructions as comment in ci.yml):
-  RAILWAY_TOKEN      — from Railway dashboard → Account Settings → Tokens
-  SUPABASE_URL       — from Supabase project Settings → API
-  SUPABASE_SERVICE_KEY — from Supabase project Settings → API → service_role key
-  FOOTBALL_DATA_API_KEY — from football-data.org dashboard
-  EXPO_TOKEN         — from expo.dev → Account Settings → Access Tokens
-  FIREBASE_SERVICE_ACCOUNT_JSON — from Firebase Console → Project Settings → Service accounts
+Required GitHub Secrets (api repo):
+  RAILWAY_TOKEN         — Railway dashboard → Account Settings → Tokens
+  SUPABASE_URL          — Supabase project Settings → API
+  SUPABASE_SERVICE_KEY  — Supabase project Settings → API → service_role key
+  FOOTBALL_DATA_API_KEY — football-data.org dashboard
+  FIREBASE_SERVICE_ACCOUNT_JSON — Firebase Console → Project Settings → Service accounts
+
+Required GitHub Secrets (mobile repo):
+  EXPO_TOKEN — expo.dev → Account Settings → Access Tokens
 
 Generate ALL files completely. This is the final step — ensure everything connects end to end.
 ```
@@ -1057,13 +906,14 @@ Generate ALL files completely. This is the final step — ensure everything conn
 
 Sau Step 6, verify các điểm sau trước khi merge vào main:
 
-**API:**
+**API (api):**
 - [ ] `GET /api/v1/health` trả về 200
 - [ ] `GET /api/v1/matches` trả về matches từ DB
 - [ ] Prisma migrations chạy thành công
 - [ ] Seed data có đủ 48 trận
 
-**Mobile:**
+**Mobile (mobile):**
+- [ ] `pod install` chạy không lỗi (standalone, không phải monorepo)
 - [ ] App build thành công trên iOS và Android
 - [ ] Login flow hoạt động (Google OAuth)
 - [ ] Onboarding đặt được username

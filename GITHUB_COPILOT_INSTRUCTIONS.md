@@ -13,12 +13,17 @@ Tài liệu này dành cho **GitHub Copilot Workspace Agent** làm việc trong 
 3. Dự đoán tỉ số trước khi trận bắt đầu
 4. Cạnh tranh điểm số — không có tiền mặt, chỉ vui
 
-**Monorepo layout:**
+**Cấu trúc — 2 repo độc lập (KHÔNG phải monorepo):**
 ```
-apps/mobile   → React Native 0.74 CLI + TypeScript
-apps/api      → Node.js + Fastify + Prisma
-packages/shared → Shared TypeScript types
+kickoff-mobile/   → React Native 0.85.3 CLI + TypeScript  (repo này hoặc repo riêng)
+kickoff-api/      → Node.js + Fastify + Prisma             (repo này hoặc repo riêng)
 ```
+
+**QUAN TRỌNG — Shared types:**
+- KHÔNG có `packages/shared` hay workspace packages
+- Shared types được copy vào `src/types/shared.ts` trong mỗi repo
+- Scoring logic được copy vào `src/utils/scoring.ts` trong mỗi repo
+- Không dùng `workspace:*` hay `@kickoff/shared` — đây không phải monorepo
 
 ---
 
@@ -26,8 +31,8 @@ packages/shared → Shared TypeScript types
 
 ### Chung
 - Luôn dùng **TypeScript strict mode** — không dùng `any`, không `@ts-ignore`
-- Import shared types từ `packages/shared`, không tự định nghĩa lại
-- Mọi API response phải wrap trong `ApiResponse<T>` từ shared
+- Import shared types từ `src/types/shared.ts` trong cùng repo, không tự định nghĩa lại
+- Mọi API response phải wrap trong `ApiResponse<T>` từ `src/types/shared.ts`
 - Không commit secrets — dùng `.env` và `.env.example`
 - Mỗi function phải có JSDoc tóm tắt mục đích nếu logic không trivial
 
@@ -39,7 +44,7 @@ packages/shared → Shared TypeScript types
 
 ---
 
-## Mobile (apps/mobile) — Conventions
+## Mobile (kickoff-mobile) — Conventions
 
 ### UI — Tamagui bắt buộc
 ```tsx
@@ -110,6 +115,40 @@ Dùng `react-native-haptic-feedback` cho:
 - Copy invite code → `HapticFeedback.trigger('impactMedium')`
 - Error → `HapticFeedback.trigger('notificationError')`
 
+### iOS / Android config
+- `ios/Podfile` dùng cấu hình **standalone** (KHÔNG phải monorepo paths)
+- `node_modules` nằm ở root của `kickoff-mobile/` — không cần `../../../`
+- Podfile chuẩn:
+
+```ruby
+require Pod::Executable.execute_command(
+  'node',
+  ['-p',
+   'require.resolve(
+     "react-native/scripts/react_native_pods.rb",
+     {paths: [process.argv[1]]},
+   )', __dir__]
+).strip
+
+platform :ios, min_ios_version_supported
+prepare_react_native_project!
+
+target 'kickoff-mobile' do
+  config = use_native_modules!
+  use_react_native!(
+    :path => config[:reactNativePath],
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+  post_install do |installer|
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false
+    )
+  end
+end
+```
+
 ### File naming
 ```
 screens/         PascalCase    HomeScreen.tsx
@@ -117,11 +156,12 @@ components/ui/   PascalCase    MatchCard.tsx
 hooks/           camelCase     useLiveScore.ts
 stores/          camelCase     authStore.ts
 utils/           camelCase     scoring.ts
+types/           camelCase     shared.ts
 ```
 
 ---
 
-## API (apps/api) — Conventions
+## API (kickoff-api) — Conventions
 
 ### Route structure
 Mỗi domain = 1 Fastify plugin file trong `src/routes/`:
@@ -212,15 +252,20 @@ cron.schedule('*/60 * * * * *', () => matchSyncService.updateLiveScores())
 
 ---
 
-## Shared types (packages/shared)
+## Shared types — copy vào từng repo
 
-Khi thêm type mới:
-1. Định nghĩa trong `packages/shared/src/index.ts`
-2. Export từ index
-3. Import trong cả mobile lẫn api từ `@kickoff/shared`
+Vì không có monorepo, shared types được duy trì độc lập trong mỗi repo.
+Khi cần thêm/sửa type: cập nhật cả 2 file bên dưới đồng thời.
+
+**kickoff-api:** `src/types/shared.ts`
+**kickoff-mobile:** `src/types/shared.ts`
 
 ```ts
-// packages/shared/src/index.ts
+// src/types/shared.ts
+export type MatchStatus = 'SCHEDULED' | 'LIVE' | 'FINISHED'
+export type MatchStage = 'GROUP' | 'R16' | 'QF' | 'SF' | 'THIRD_PLACE' | 'FINAL'
+export type ScoringMode = 'EXACT_SCORE' | 'OUTCOME_ONLY'
+
 export interface Match {
   id: string
   externalId: string
@@ -228,15 +273,16 @@ export interface Match {
   awayTeam: string
   homeScore: number | null
   awayScore: number | null
-  scheduledAt: string   // ISO string (serializable qua network)
+  scheduledAt: string   // ISO string
   status: MatchStatus
   stage: MatchStage
   groupName: string | null
   venue: string | null
 }
 
-export type MatchStatus = 'SCHEDULED' | 'LIVE' | 'FINISHED'
-export type MatchStage = 'GROUP' | 'R16' | 'QF' | 'SF' | 'THIRD_PLACE' | 'FINAL'
+export interface ApiResponse<T> { success: boolean; data: T }
+export interface PaginatedResponse<T> { success: boolean; data: T[]; total: number; page: number; pageSize: number }
+// ... các interfaces khác xem đầy đủ trong file
 ```
 
 ---
@@ -283,10 +329,14 @@ it('shows LIVE badge when match is live', () => {
 
 ---
 
-## Scoring logic (nguồn duy nhất tại packages/shared)
+## Scoring logic
+
+Nguồn duy nhất: `src/utils/scoring.ts` trong mỗi repo (nội dung giống hệt nhau).
 
 ```ts
-// packages/shared/src/scoring.ts
+// src/utils/scoring.ts
+import type { ScoringMode } from '@/types/shared'
+
 export function calculatePoints(
   predictedHome: number,
   predictedAway: number,
@@ -313,13 +363,11 @@ export function calculatePoints(
 }
 ```
 
-Hàm này import cả trong `predictionService.ts` (settlement) và trong mobile (preview points trước khi submit).
-
 ---
 
 ## Environment variables
 
-### API (.env)
+### API (kickoff-api/.env)
 | Var | Bắt buộc | Mô tả |
 |---|---|---|
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
@@ -330,7 +378,7 @@ Hàm này import cả trong `predictionService.ts` (settlement) và trong mobile
 | `PORT` | ❌ | Default: 3000 |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | ✅ | FCM push notifications |
 
-### Mobile (.env)
+### Mobile (kickoff-mobile/.env)
 | Var | Bắt buộc | Mô tả |
 |---|---|---|
 | `API_URL` | ✅ | Base URL của API |
@@ -388,21 +436,28 @@ node-cron mỗi 60s:
 - ❌ Không gọi `prisma` trực tiếp từ routes — qua service layer
 - ❌ Không hiện predictions của người khác khi match còn SCHEDULED
 - ❌ Không cho phép đặt prediction sau khi match đã bắt đầu
+- ❌ Không dùng monorepo workspaces — 2 repo độc lập
+- ❌ Không import từ `@kickoff/shared` — import từ `src/types/shared.ts`
+- ❌ Không dùng `../../../node_modules` trong Podfile — dùng `config[:reactNativePath]`
 
 ---
 
 ## CI pipeline
 
-GitHub Actions chạy 2 jobs khi có push/PR:
+**kickoff-api** — GitHub Actions chạy khi có push/PR:
 
 **lint-and-test** (tất cả branches):
-1. `npm run lint` — ESLint toàn monorepo
-2. `npm run test` — Vitest (API) + Jest (Mobile)
-3. Build check: `npm run build`
+1. `npm run lint` — ESLint
+2. `npm run test` — Vitest
+3. `npm run build` — build check
 
 **deploy** (chỉ khi merge vào `main`):
-1. `railway up` — deploy API lên Railway
-2. `eas build --profile preview` — build mobile internal distribution
+1. `railway up --service kickoff-api`
+
+**kickoff-mobile** — GitHub Actions:
+
+**build-mobile** (chỉ khi merge vào `main`):
+1. `eas build --platform all --profile preview`
 
 PR không được merge nếu CI fail.
 

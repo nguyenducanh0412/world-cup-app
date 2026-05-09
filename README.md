@@ -2,7 +2,7 @@
 
 > Xem lịch thi đấu, dự đoán kết quả, cạnh tranh điểm số cùng bạn bè — không tiền mặt, chỉ vui thôi.
 
-![React Native](https://img.shields.io/badge/React_Native-0.74-61DAFB?logo=react)
+![React Native](https://img.shields.io/badge/React_Native-0.85.3-61DAFB?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript)
 ![Fastify](https://img.shields.io/badge/Fastify-4.x-000000?logo=fastify)
 ![Supabase](https://img.shields.io/badge/Supabase-realtime-3ECF8E?logo=supabase)
@@ -23,10 +23,10 @@
 
 ## Tech Stack
 
-### Mobile (apps/mobile)
+### Mobile (kickoff-mobile)
 | Thư viện | Mục đích |
 |---|---|
-| React Native 0.74 CLI | Core framework |
+| React Native 0.85.3 CLI | Core framework |
 | TypeScript | Type safety |
 | Tamagui | UI design system, dark mode |
 | React Navigation v7 | Routing (tabs + stack + modal) |
@@ -40,7 +40,7 @@
 | react-native-fast-image | Flag & avatar caching |
 | dayjs | Date/time + timezone |
 
-### API (apps/api)
+### API (kickoff-api)
 | Thư viện | Mục đích |
 |---|---|
 | Fastify 4 | HTTP server |
@@ -64,36 +64,43 @@
 
 ## Cấu trúc thư mục
 
+**2 repo độc lập — không phải monorepo:**
+
 ```
-kickoff/
-├── apps/
-│   ├── mobile/                    # React Native app
-│   │   ├── android/
-│   │   ├── ios/
-│   │   └── src/
-│   │       ├── components/        # Tamagui UI components
-│   │       │   └── ui/            # Badge, MatchCard, PredictionInput...
-│   │       ├── screens/           # All screens
-│   │       ├── navigation/        # React Navigation setup
-│   │       ├── hooks/             # Custom hooks (useLiveScore, useNotifications...)
-│   │       ├── stores/            # Zustand stores
-│   │       ├── api/               # Axios client + API functions
-│   │       └── utils/             # Date helpers, scoring logic
-│   │
-│   └── api/                       # Fastify backend
-│       ├── prisma/
-│       │   ├── schema.prisma
-│       │   └── seed.ts
-│       └── src/
-│           ├── routes/            # matches, rooms, predictions, users
-│           ├── services/          # matchSync, notification, supabaseSync...
-│           ├── middleware/        # auth (Supabase JWT verify)
-│           └── index.ts
-│
-└── packages/
-    └── shared/                    # Shared TypeScript types
-        └── src/index.ts
+kickoff-api/
+├── prisma/
+│   ├── schema.prisma
+│   └── seed.ts
+├── src/
+│   ├── routes/            # matches, rooms, predictions, users
+│   ├── services/          # matchSync, notification, supabaseSync...
+│   ├── middleware/        # auth (Supabase JWT verify)
+│   ├── types/
+│   │   └── shared.ts      # Shared TypeScript types (copy từ mobile)
+│   └── utils/
+│       └── scoring.ts     # Scoring logic (copy từ mobile)
+├── .env.example
+└── index.ts
+
+kickoff-mobile/
+├── android/
+├── ios/
+└── src/
+    ├── components/
+    │   └── ui/            # Badge, MatchCard, PredictionInput...
+    ├── screens/           # All screens
+    ├── navigation/        # React Navigation setup
+    ├── hooks/             # useLiveScore, useNotifications...
+    ├── stores/            # Zustand stores
+    ├── api/               # Axios client + API functions
+    ├── types/
+    │   └── shared.ts      # Shared TypeScript types (copy từ api)
+    └── utils/
+        └── scoring.ts     # Scoring logic (copy từ api)
 ```
+
+> **Shared types & scoring logic** được giữ đồng bộ thủ công giữa 2 repo.
+> Khi thay đổi một bên, nhớ cập nhật bên kia.
 
 ---
 
@@ -107,42 +114,48 @@ kickoff/
 - Xcode (iOS) / Android Studio (Android)
 - Ruby + CocoaPods (iOS)
 
-### 1. Clone & cài đặt
+### 1. Clone cả 2 repo
 
 ```bash
-git clone https://github.com/your-org/kickoff.git
-cd kickoff
-npm install
+git clone https://github.com/your-org/kickoff-api.git
+git clone https://github.com/your-org/kickoff-mobile.git
 ```
 
-### 2. Cấu hình environment
+### 2. Setup API
 
 ```bash
+cd kickoff-api
+npm install
 cp .env.example .env
 ```
 
 Điền các giá trị vào `.env`:
 
 ```env
-# Database
 DATABASE_URL="postgresql://user:pass@localhost:5432/kickoff"
-
-# Supabase
 SUPABASE_URL="https://xxxx.supabase.co"
-SUPABASE_ANON_KEY="eyJ..."
 SUPABASE_SERVICE_KEY="eyJ..."
-
-# Football data
 FOOTBALL_DATA_API_KEY="your_key_from_football-data.org"
-
-# Auth
 JWT_SECRET="your-secret-min-32-chars"
-
-# Server
 PORT=3000
+FIREBASE_SERVICE_ACCOUNT_JSON='{...}'
 ```
 
-Cho mobile, tạo `apps/mobile/.env`:
+```bash
+npm run db:migrate   # chạy Prisma migrations
+npm run db:seed      # seed 48 trận group stage WC2026
+npm run dev          # API chạy tại http://localhost:3000
+```
+
+### 3. Setup Mobile
+
+```bash
+cd kickoff-mobile
+npm install
+cp .env.example .env
+```
+
+Điền `.env`:
 
 ```env
 API_URL=http://localhost:3000/api/v1
@@ -150,35 +163,14 @@ SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_ANON_KEY=eyJ...
 ```
 
-### 3. Setup database
-
-```bash
-cd apps/api
-npm run db:migrate   # chạy Prisma migrations
-npm run db:seed      # seed 48 trận group stage WC2026
-```
-
-### 4. Chạy API
-
-```bash
-cd apps/api
-npm run dev
-# → API chạy tại http://localhost:3000
-# → GET http://localhost:3000/api/v1/health để kiểm tra
-```
-
-### 5. Chạy mobile
-
 **iOS:**
 ```bash
-cd apps/mobile
-npx pod-install ios
+cd ios && pod install && cd ..
 npm run ios
 ```
 
 **Android:**
 ```bash
-cd apps/mobile
 npm run android
 ```
 
@@ -230,20 +222,17 @@ PUT  /api/v1/users/push-token          (auth)
 ## Scripts
 
 ```bash
-# Root — chạy tất cả workspaces
-npm run dev          # chạy api + mobile song song
-npm run lint         # lint tất cả
-npm run test         # test tất cả
-npm run build        # build tất cả
-
-# apps/api
+# kickoff-api
 npm run dev          # ts-node-dev watch mode
 npm run build        # tsc compile
+npm run test         # Vitest
+npm run lint         # ESLint
 npm run db:migrate   # prisma migrate dev
 npm run db:seed      # seed data
 npm run db:studio    # Prisma Studio UI
+npm run db:reset     # prisma migrate reset
 
-# apps/mobile
+# kickoff-mobile
 npm run ios          # run on iOS simulator
 npm run android      # run on Android emulator
 npm run lint         # ESLint
@@ -254,16 +243,18 @@ npm run test         # Jest
 
 ## Deploy
 
-API được deploy lên Railway tự động khi merge vào `main`.
+**API** deploy lên Railway tự động khi merge vào `main`:
 
 ```bash
 # Manual deploy
+cd kickoff-api
 railway up --service kickoff-api
 ```
 
-Mobile build qua EAS (sau khi setup):
+**Mobile** build qua EAS:
+
 ```bash
-cd apps/mobile
+cd kickoff-mobile
 eas build --platform all --profile preview
 ```
 
@@ -271,4 +262,6 @@ eas build --platform all --profile preview
 
 ## Contributing
 
-Xem [GITHUB_COPILOT_INSTRUCTIONS.md](./GITHUB_COPILOT_INSTRUCTIONS.md) để biết cách làm việc với Copilot Workspace Agent trong dự án này.
+Xem [GITHUB_COPILOT_INSTRUCTIONS.md](./GITHUB_COPILOT_INSTRUCTIONS.md) để biết conventions và cách làm việc với Copilot Workspace Agent trong dự án này.
+
+Xem [COPILOT_STEPS.md](./COPILOT_STEPS.md) để có đầy đủ 6 prompts build từng bước.
