@@ -1,21 +1,45 @@
-import React from 'react';
-import { TamaguiProvider } from 'tamagui';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import config from './tamagui.config';
-
-const queryClient = new QueryClient();
-
 /**
- * Main App component
+ * Sample React Native App
+ * https://github.com/facebook/react-native
+ *
+ * @format
  */
-function App(): React.JSX.Element {
+
+import { NewAppScreen } from '@react-native/new-app-screen';
+import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+
+function App() {
+  const isDarkMode = useColorScheme() === 'dark';
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <TamaguiProvider config={config} defaultTheme="dark">
-        {/* Navigation will be added in later steps */}
-      </TamaguiProvider>
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+      <AppContent />
+    </SafeAreaProvider>
   );
 }
+
+function AppContent() {
+  const safeAreaInsets = useSafeAreaInsets();
+
+  return (
+    <View style={styles.container}>
+      <NewAppScreen
+        templateFileName="App.tsx"
+        safeAreaInsets={safeAreaInsets}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
 
 export default App;

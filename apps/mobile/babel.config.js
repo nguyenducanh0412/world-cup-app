@@ -6,8 +6,11 @@ module.exports = {
       {
         components: ['tamagui'],
         config: './tamagui.config.ts',
+        logTimings: true,
+        disableExtraction: process.env.NODE_ENV === 'development',
       },
     ],
-    'react-native-reanimated/plugin', // Must be last
+    // Reanimated plugin must be listed last
+    'react-native-reanimated/plugin',
   ],
 };
