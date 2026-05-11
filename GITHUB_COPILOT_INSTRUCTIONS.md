@@ -15,8 +15,8 @@ Tài liệu này dành cho **GitHub Copilot Workspace Agent** làm việc trong 
 
 **Cấu trúc — 2 repo độc lập (KHÔNG phải monorepo):**
 ```
-kickoff-mobile/   → React Native 0.85.3 CLI + TypeScript  (repo này hoặc repo riêng)
-kickoff-api/      → Node.js + Fastify + Prisma             (repo này hoặc repo riêng)
+mobile/   → React Native 0.85.3 CLI + TypeScript  (repo này hoặc repo riêng)
+api/      → Node.js + Fastify + Prisma             (repo này hoặc repo riêng)
 ```
 
 **QUAN TRỌNG — Shared types:**
@@ -44,7 +44,7 @@ kickoff-api/      → Node.js + Fastify + Prisma             (repo này hoặc r
 
 ---
 
-## Mobile (kickoff-mobile) — Conventions
+## Mobile (mobile) — Conventions
 
 ### UI — Tamagui bắt buộc
 ```tsx
@@ -117,7 +117,7 @@ Dùng `react-native-haptic-feedback` cho:
 
 ### iOS / Android config
 - `ios/Podfile` dùng cấu hình **standalone** (KHÔNG phải monorepo paths)
-- `node_modules` nằm ở root của `kickoff-mobile/` — không cần `../../../`
+- `node_modules` nằm ở root của `mobile/` — không cần `../../../`
 - Podfile chuẩn:
 
 ```ruby
@@ -133,7 +133,7 @@ require Pod::Executable.execute_command(
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-target 'kickoff-mobile' do
+target 'mobile' do
   config = use_native_modules!
   use_react_native!(
     :path => config[:reactNativePath],
@@ -161,7 +161,7 @@ types/           camelCase     shared.ts
 
 ---
 
-## API (kickoff-api) — Conventions
+## API (api) — Conventions
 
 ### Route structure
 Mỗi domain = 1 Fastify plugin file trong `src/routes/`:
@@ -257,8 +257,8 @@ cron.schedule('*/60 * * * * *', () => matchSyncService.updateLiveScores())
 Vì không có monorepo, shared types được duy trì độc lập trong mỗi repo.
 Khi cần thêm/sửa type: cập nhật cả 2 file bên dưới đồng thời.
 
-**kickoff-api:** `src/types/shared.ts`
-**kickoff-mobile:** `src/types/shared.ts`
+**api:** `src/types/shared.ts`
+**mobile:** `src/types/shared.ts`
 
 ```ts
 // src/types/shared.ts
@@ -367,7 +367,7 @@ export function calculatePoints(
 
 ## Environment variables
 
-### API (kickoff-api/.env)
+### API (api/.env)
 | Var | Bắt buộc | Mô tả |
 |---|---|---|
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
@@ -378,7 +378,7 @@ export function calculatePoints(
 | `PORT` | ❌ | Default: 3000 |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | ✅ | FCM push notifications |
 
-### Mobile (kickoff-mobile/.env)
+### Mobile (mobile/.env)
 | Var | Bắt buộc | Mô tả |
 |---|---|---|
 | `API_URL` | ✅ | Base URL của API |
@@ -444,7 +444,7 @@ node-cron mỗi 60s:
 
 ## CI pipeline
 
-**kickoff-api** — GitHub Actions chạy khi có push/PR:
+**api** — GitHub Actions chạy khi có push/PR:
 
 **lint-and-test** (tất cả branches):
 1. `npm run lint` — ESLint
@@ -452,9 +452,9 @@ node-cron mỗi 60s:
 3. `npm run build` — build check
 
 **deploy** (chỉ khi merge vào `main`):
-1. `railway up --service kickoff-api`
+1. `railway up --service api`
 
-**kickoff-mobile** — GitHub Actions:
+**mobile** — GitHub Actions:
 
 **build-mobile** (chỉ khi merge vào `main`):
 1. `eas build --platform all --profile preview`

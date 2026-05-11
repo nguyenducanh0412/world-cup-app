@@ -23,7 +23,7 @@
 
 ## Tech Stack
 
-### Mobile (kickoff-mobile)
+### Mobile (mobile)
 | Thư viện | Mục đích |
 |---|---|
 | React Native 0.85.3 CLI | Core framework |
@@ -40,7 +40,7 @@
 | react-native-fast-image | Flag & avatar caching |
 | dayjs | Date/time + timezone |
 
-### API (kickoff-api)
+### API (api)
 | Thư viện | Mục đích |
 |---|---|
 | Fastify 4 | HTTP server |
@@ -67,7 +67,7 @@
 **2 repo độc lập — không phải monorepo:**
 
 ```
-kickoff-api/
+api/
 ├── prisma/
 │   ├── schema.prisma
 │   └── seed.ts
@@ -82,7 +82,7 @@ kickoff-api/
 ├── .env.example
 └── index.ts
 
-kickoff-mobile/
+mobile/
 ├── android/
 ├── ios/
 └── src/
@@ -117,14 +117,14 @@ kickoff-mobile/
 ### 1. Clone cả 2 repo
 
 ```bash
-git clone https://github.com/your-org/kickoff-api.git
-git clone https://github.com/your-org/kickoff-mobile.git
+git clone https://github.com/your-org/api.git
+git clone https://github.com/your-org/mobile.git
 ```
 
 ### 2. Setup API
 
 ```bash
-cd kickoff-api
+cd api
 npm install
 cp .env.example .env
 ```
@@ -150,7 +150,7 @@ npm run dev          # API chạy tại http://localhost:3000
 ### 3. Setup Mobile
 
 ```bash
-cd kickoff-mobile
+cd mobile
 npm install
 cp .env.example .env
 ```
@@ -222,7 +222,7 @@ PUT  /api/v1/users/push-token          (auth)
 ## Scripts
 
 ```bash
-# kickoff-api
+# api
 npm run dev          # ts-node-dev watch mode
 npm run build        # tsc compile
 npm run test         # Vitest
@@ -232,7 +232,7 @@ npm run db:seed      # seed data
 npm run db:studio    # Prisma Studio UI
 npm run db:reset     # prisma migrate reset
 
-# kickoff-mobile
+# mobile
 npm run ios          # run on iOS simulator
 npm run android      # run on Android emulator
 npm run lint         # ESLint
@@ -247,14 +247,14 @@ npm run test         # Jest
 
 ```bash
 # Manual deploy
-cd kickoff-api
-railway up --service kickoff-api
+cd api
+railway up --service api
 ```
 
 **Mobile** build qua EAS:
 
 ```bash
-cd kickoff-mobile
+cd mobile
 eas build --platform all --profile preview
 ```
 
