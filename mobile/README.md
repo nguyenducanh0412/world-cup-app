@@ -1,97 +1,115 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# KickOff Mobile
 
-# Getting Started
+React Native mobile application for World Cup 2026 match viewing and friend betting.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Tech Stack
 
-## Step 1: Start Metro
+- **React Native** 0.85.3 (CLI, not Expo)
+- **React** 19.2.3
+- **TypeScript** 5.8.3
+- **Tamagui** - UI design system with dark theme
+- **React Navigation** v7 - Routing
+- **Reanimated** 3 + **Moti** - Animations
+- **React Query** - Server state management
+- **Zustand** - Client state management
+- **Supabase** - Auth + Realtime
+- **Notifee** + **Firebase** - Push notifications
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Prerequisites
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+- Node.js 22.11.0+
+- npm 10+
+- Xcode (iOS development)
+- Android Studio (Android development)
+- Ruby + CocoaPods (iOS)
 
-```sh
-# Using npm
+## Setup
+
+### 1. Install dependencies
+
+```bash
+npm install --legacy-peer-deps
+```
+
+> **Note:** The `--legacy-peer-deps` flag is required for React 19 compatibility with some packages.
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Fill in your values in `.env`:
+- `API_URL` - Backend API URL
+- `SUPABASE_URL` - Supabase project URL
+- `SUPABASE_ANON_KEY` - Supabase anon key
+
+### 3. iOS Setup
+
+```bash
+cd ios
+pod install
+cd ..
+npm run ios
+```
+
+### 4. Android Setup
+
+```bash
+npm run android
+```
+
+## Project Structure
+
+```
+src/
+├── api/              # API client and functions
+├── components/ui/    # Reusable UI components
+├── hooks/            # Custom React hooks
+├── navigation/       # React Navigation setup
+├── screens/          # Screen components
+├── stores/           # Zustand stores
+├── types/            # TypeScript types
+│   └── shared.ts     # Shared types with API
+└── utils/            # Utility functions
+    └── scoring.ts    # Scoring logic
+```
+
+## Development
+
+```bash
+# Start Metro bundler
 npm start
 
-# OR using Yarn
-yarn start
-```
-
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+# Run on iOS
 npm run ios
 
-# OR using Yarn
-yarn ios
+# Run on Android
+npm run android
+
+# Lint
+npm run lint
+
+# Test
+npm run test
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+## Key Features
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+- 🎨 **Dark Theme** - Custom Tamagui theme with World Cup colors
+- ⚡ **Realtime Updates** - Live scores via Supabase Realtime
+- 🔔 **Push Notifications** - Match reminders and results
+- 🎯 **TypeScript** - Full type safety with strict mode
+- 📱 **Native Animations** - Smooth 60fps animations with Reanimated
 
-## Step 3: Modify your app
+## Important Notes
 
-Now that you have successfully run the app, let's make changes!
+- This is a **standalone** React Native project (not a monorepo)
+- Shared types are copied from `api/src/types/shared.ts` - keep in sync manually
+- Use Tamagui components instead of React Native core components
+- All API calls go through React Query - no direct fetch in useEffect
+- Use `--legacy-peer-deps` when installing new packages
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+## Contributing
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+See [GITHUB_COPILOT_INSTRUCTIONS.md](../GITHUB_COPILOT_INSTRUCTIONS.md) for coding conventions.

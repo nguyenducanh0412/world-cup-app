@@ -1,0 +1,57 @@
+name: API CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: api/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: api
+        run: npm ci
+      
+      - name: Lint
+        working-directory: api
+        run: npm run lint
+      
+      - name: Test
+        working-directory: api
+        run: npm run test
+      
+      - name: Build
+        working-directory: api
+        run: npm run build
+  
+  deploy-api:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      
+      - name: Deploy to Railway
+        working-directory: api
+        run: railway up --service api
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

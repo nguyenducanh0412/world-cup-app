@@ -1,0 +1,30 @@
+name: Mobile CI
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-mobile:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      
+      - name: Setup EAS CLI
+        run: npm install -g eas-cli
+      
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci
+      
+      - name: EAS Build
+        working-directory: mobile
+        run: eas build --platform all --profile preview --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
